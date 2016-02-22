@@ -34,38 +34,38 @@ int main(int argc, char** argv)
    
 }
 
-void merge(int a[], int low, int mid, int high)
+void merge(int initialArray[], int low, int mid, int high)
 {
-    int aCount = sizeof(a)/sizeof(a[0]);   //get the size of a
-    int b[aCount];                               //make a second temp array of same size
-    int i = low, j = mid + 1, k = 0;            
+    int aCount = sizeof(initialArray)/sizeof(initialArray[0]);   //get the size of a
+    int tempArray[aCount];                               //make a second temp array of same size
+    int i = low, j = mid + 1, tempCount = 0;            
   
     while (i <= mid && j <= high) { //most of the sorting is done here
-        if (a[i] <= a[j])
-            b[k++] = a[i++];
+        if (initialArray[i] <= initialArray[j])
+            tempArray[tempCount++] = initialArray[i++];
         else
-            b[k++] = a[j++];
+            tempArray[tempCount++] = initialArray[j++];
     }
     while (i <= mid) //the bottom half didn't finish sorting
-        b[k++] = a[i++];
+		tempArray[tempCount++] = initialArray[i++];
   
     while (j <= high) //the top half didn't finish sorting
-        b[k++] = a[j++];
+		tempArray[tempCount++] = initialArray[j++];
   
-    k--;
-    while (k >= 0) { //set our array equal to the temp array
-        a[low + k] = b[k];
-        k--;
+    tempCount--;
+    while (tempCount >= 0) { //set our array equal to the temp array
+        initialArray[low + tempCount] = tempArray[tempCount];
+        tempCount--;
     }
 }
   
-void mergesort(int a[], int low, int high)
+void mergesort(int initialArray[], int low, int high)
 {
     if (low < high) { //if there is only one item, do nothing
         int m = (high + low)/2;     //find the middle
-        mergesort(a, low, m);       //split in half, sending each to a differnt call of mergesort
-        mergesort(a, m + 1, high);  //this could be the fork() point
-        merge(a, low, m, high); 
+        mergesort(initialArray, low, m);       //split in half, sending each to a differnt call of mergesort
+        mergesort(initialArray, m + 1, high);  //this could be the fork() point
+        merge(initialArray, low, m, high); 
     }
 }
 
