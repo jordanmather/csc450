@@ -4,9 +4,14 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
+void readInput(int max, char* userinput);
 
 int main(int argc, char** argv)
 {
+    int max = 20;
+    char* userinput = (char*)malloc(max);
     uint16_t port = 3000;
     int error;
     struct sockaddr_in* server = malloc(sizeof(struct sockaddr_in));
@@ -27,9 +32,6 @@ int main(int argc, char** argv)
         //Receive a reply from the server
         
         char* server_reply = malloc(2000 * sizeof(char));
-        char* client_response = malloc(2000 * sizeof(char));
-        
-        
         while(1)
         {
             error = recv(sockfd, server_reply, sizeof(server_reply), 0);
@@ -39,14 +41,46 @@ int main(int argc, char** argv)
             }
             else
             {
-                puts("Reply received\n");
+                printf("message: ");
                 puts(server_reply);
-                client_response = "ClienT reply"; //this is where the method to get user input would be
-                puts("send client reply");
-                send(sockfd, client_response, sizeof(client_response), 0);
+                
+                readInput(max, userinput);
+                send(sockfd, userinput , strlen(userinput) , 0);
             }
         }
     }
     free(server);
     return 0;
+}
+
+void readInput(int max, char* userinput)
+{
+    while (1) 
+    { /* skip leading whitespace */
+        int c = getchar();
+        if (c == EOF) break; /* end of file */
+        if (!isspace(c)) 
+        {
+             ungetc(c, stdin);
+             break;
+        }
+    }
+    
+    int i = 0;
+    while (1) 
+    {
+        int c = getchar();
+        if (c == '\n') /* at end, add terminating zero */
+        {
+            userinput[i] = 0;
+            break;
+        }
+        userinput[i] = c;
+        if (i == max - 1) /* buffer full */
+        { 
+            max = max + max;
+            userinput = (char*)realloc(userinput, max); /* get a new and larger buffer */
+        }
+        i++;
+    }
 }
