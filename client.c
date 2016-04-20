@@ -6,12 +6,9 @@
 #include <stdio.h>
 #include <string.h>
 
-void readInput(int max, char* userinput);
 
 int main(int argc, char** argv)
 {
-    int max = 20;
-    char* userinput = (char*)malloc(max);
     uint16_t port = 3000;
     int error;
     struct sockaddr_in* server = malloc(sizeof(struct sockaddr_in));
@@ -30,57 +27,25 @@ int main(int argc, char** argv)
     {
         puts("We are Connected");
         //Receive a reply from the server
-        
-        char* server_reply = malloc(2000 * sizeof(char));
+        int MAX_SIZE = 2000 * sizeof(char);
+        char* server_reply = malloc(MAX_SIZE);
         while(1)
         {
-            error = recv(sockfd, server_reply, sizeof(server_reply), 0);
+            error = recv(sockfd, server_reply, MAX_SIZE, 0);
             if(error < 0)
             {
                 puts("recv failed");
             }
             else
             {
-                printf("message: ");
+                puts("Reply received\n");
                 puts(server_reply);
                 
-                readInput(max, userinput);
-                send(sockfd, userinput , strlen(userinput) , 0);
+                char* message = "yo\tyo";
+                send(sockfd, message , strlen(message) , 0);
             }
         }
     }
     free(server);
     return 0;
-}
-
-void readInput(int max, char* userinput)
-{
-    while (1) 
-    { /* skip leading whitespace */
-        int c = getchar();
-        if (c == EOF) break; /* end of file */
-        if (!isspace(c)) 
-        {
-             ungetc(c, stdin);
-             break;
-        }
-    }
-    
-    int i = 0;
-    while (1) 
-    {
-        int c = getchar();
-        if (c == '\n') /* at end, add terminating zero */
-        {
-            userinput[i] = 0;
-            break;
-        }
-        userinput[i] = c;
-        if (i == max - 1) /* buffer full */
-        { 
-            max = max + max;
-            userinput = (char*)realloc(userinput, max); /* get a new and larger buffer */
-        }
-        i++;
-    }
 }
