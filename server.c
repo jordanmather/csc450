@@ -6,28 +6,36 @@
 #include <stdio.h>
 #include <string.h>
 #include <semaphore.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 void setupServerSocket();
-void broadcast(char* msg, int* clients, int numClients);
+void broadcast(char* msg);
 void sendMessage(char* msg, int client);
 void childStuff(int clientfd);
-char* receiveMessage(int clientfd);
+void receiveMessage(int clientfd);
 
 struct sockaddr_in* server;
-uint16_t port = 3000;
+uint16_t port = 4000;
 int sockfd;
 socklen_t serverSize;
-int numberOfConnectedClients;
-sem_t block;
-int* clients;
+int clientsID;
+int numberOfConnectedClientsID;
 
 int main(int argc, char** argv)
 {
     server = malloc(sizeof(struct sockaddr_in));
     int clientfd;
+   
+    //create share mem
     int MAX_CLIENTS = 1000;
-    clients = malloc(MAX_CLIENTS * sizeof(int));
-    numberOfConnectedClients = 0;
+    clientsID = shmget(IPC_PRIVATE, MAX_CLIENTS * sizeof(int), IPC_CREAT | 0666);
+    numberOfConnectedClientsID = shmget(IPC_PRIVATE, sizeof(int), IPC_CREAT | 0666);
+    
+    //link to shared mem
+    int* clients = shmat(clientsID, NULL, 0);
+    int* numberOfConnectedClients = shmat(numberOfConnectedClientsID, NULL, 0);
+    sem_t block;
     sem_init(&block, 0, 1);
     
     char* message = "hello";
@@ -43,10 +51,8 @@ int main(int argc, char** argv)
     
     //add this client to our array of clients
     sem_wait(&block);
-    clients[numberOfConnectedClients++] = clientfd;
+    clients[(*numberOfConnectedClients)++] = clientfd;
     sem_post(&block);
-    
-    //broadcast(message, clients, numberOfConnectedClients);
     
     pid = fork();
     
@@ -66,22 +72,19 @@ int main(int argc, char** argv)
 
 void childStuff(int clientfd)
 {
-    printf("Child Stuff\n");
     sendMessage("Hello from the child.  Do you have candy?", clientfd);
-    char* message = receiveMessage(clientfd);
-    sem_wait(&block);
-    broadcast(message, clients, numberOfConnectedClients);
-    sem_post(&block);
-    
-    
+    while(1)
+    {
+        receiveMessage(clientfd);
+    }
 }
 
-char* receiveMessage(int clientfd)
+void receiveMessage(int clientfd)
 {
     int MAX_SIZE = 2000 * sizeof(char);
     char* server_reply = malloc(MAX_SIZE);
     int error = recv(clientfd, server_reply, MAX_SIZE, 0);
-    puts(server_reply);
+    broadcast(server_reply);
 }
 
 void setupServerSocket()
@@ -115,22 +118,67 @@ void setupServerSocket()
 
 void sendMessage(char* msg, int client)
 {
-    puts("Sending a message");
-    printf("Size of msg is: %d\n", (int)sizeof(*msg));
-    printf("Size of msg is: %d\n", (int)strlen(msg));
+    printf("Sending a message: %s\n", msg);
+    //printf("Size of msg is: %d\n", (int)sizeof(*msg));
+    //printf("Size of msg is: %d\n", (int)strlen(msg));
     send(client , msg , strlen(msg) , 0);
     puts("Message Sent");
 }
 
-void broadcast(char* msg, int* clients, int numClients)
+void broadcast(char* msg)
 {
+    int* clients = shmat(clientsID, NULL, 0);
+    int* numberOfConnectedClients = shmat(numberOfConnectedClientsID, NULL, 0);
+    puts(msg);
+    int whisper = checkForWhisper(msg);
+    if(whisper != 0)
+    {
+        printf("This is a whisper to: %d\n", whisper);
+    }
     int i;
-    for(i = 0; i < numClients; i++)
+    for(i = 0; i < *numberOfConnectedClients; i++)
     {
         printf("Trying to send to client with FD: %d\n", clients[i]);
+        printf("Sending a message: %s\n", msg);
         //printf("Trying to send to client with FD: %d\n", *(clients + (i * sizeof(int))));
-        
         send(clients[i] , msg , strlen(msg) , 0);
         puts("sent");
     }
+}
+
+//whisper is formatted as: @5:message (where 5 is the client to send the message to, and message is the message to be sent)
+//if the message is a whisper
+//return who it is to if a whisper
+//return 0 if general message
+//return -1 if error
+int checkForWhisper(char* msg)
+{
+    char* token;
+    char* message;
+    strcpy(message, msg);
+    token = strtok(message, ":");
+    if(token != NULL)
+    {
+        //check token to determine if it is a whisper
+        if(token[0] == '@')
+        {
+            char recipient[strlen(token-1)];
+            int i = 1;
+            for(i; i < strlen(token-1); i++)
+            {
+                recipient[i] = token[i];
+            }
+            //change recipient to int
+            int answer = atoi(recipient);
+            return answer;
+        }
+        else{
+            return 0;
+        }
+    }
+    else
+    {
+        return 0;
+    }
+    
 }
