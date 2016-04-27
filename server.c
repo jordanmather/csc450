@@ -14,6 +14,7 @@ void broadcast(char* msg);
 void sendMessage(char* msg, int client);
 void childStuff(int clientfd);
 void receiveMessage(int clientfd);
+int checkForWhisper(const char* msg, int msglen);
 
 struct sockaddr_in* server;
 uint16_t port = 4000;
@@ -82,9 +83,32 @@ void childStuff(int clientfd)
 void receiveMessage(int clientfd)
 {
     int MAX_SIZE = 2000 * sizeof(char);
-    char* server_reply = malloc(MAX_SIZE);
-    int error = recv(clientfd, server_reply, MAX_SIZE, 0);
-    broadcast(server_reply);
+    char* clientMessage = malloc(MAX_SIZE);
+    int error = recv(clientfd, clientMessage, MAX_SIZE, 0);
+    int* numberOfConnectedClients = shmat(numberOfConnectedClientsID, NULL, 0);
+    
+    //check to see if the message is a whisper
+    int whisper = checkForWhisper(clientMessage, strlen(clientMessage));
+    puts("check for whisper done");
+    if(whisper != 0)
+    {
+        printf("This is a whisper to: %d\n", whisper);
+        if(whisper <= *numberOfConnectedClients)
+        {
+            sendMessage(clientMessage, whisper);    
+        }
+        else
+        {
+            //invalid client
+            sendMessage("Invalid recipient", clientfd);
+            
+        }
+        
+    }
+    else{
+       broadcast(clientMessage); 
+    }
+    
 }
 
 void setupServerSocket()
@@ -129,18 +153,12 @@ void broadcast(char* msg)
 {
     int* clients = shmat(clientsID, NULL, 0);
     int* numberOfConnectedClients = shmat(numberOfConnectedClientsID, NULL, 0);
-    puts(msg);
-    int whisper = checkForWhisper(msg);
-    if(whisper != 0)
-    {
-        printf("This is a whisper to: %d\n", whisper);
-    }
+    printf("The current message is: %s\n", msg);
+    
     int i;
     for(i = 0; i < *numberOfConnectedClients; i++)
     {
         printf("Trying to send to client with FD: %d\n", clients[i]);
-        printf("Sending a message: %s\n", msg);
-        //printf("Trying to send to client with FD: %d\n", *(clients + (i * sizeof(int))));
         send(clients[i] , msg , strlen(msg) , 0);
         puts("sent");
     }
@@ -151,25 +169,25 @@ void broadcast(char* msg)
 //return who it is to if a whisper
 //return 0 if general message
 //return -1 if error
-int checkForWhisper(char* msg)
+int checkForWhisper(const char* msg, int msglen)
 {
     char* token;
-    char* message;
+    char message[msglen];
+    memset(message, '\0', sizeof(message));
     strcpy(message, msg);
-    token = strtok(message, ":");
-    if(token != NULL)
+    char* result = strstr(msg, ":");
+    if(result != NULL)
     {
+        
+        token = strtok(message, ":");
+        puts(token);
         //check token to determine if it is a whisper
         if(token[0] == '@')
         {
             char recipient[strlen(token-1)];
-            int i = 1;
-            for(i; i < strlen(token-1); i++)
-            {
-                recipient[i] = token[i];
-            }
+            token = strtok(token, "@");
             //change recipient to int
-            int answer = atoi(recipient);
+            int answer = atoi(token);
             return answer;
         }
         else{
@@ -180,5 +198,4 @@ int checkForWhisper(char* msg)
     {
         return 0;
     }
-    
 }
