@@ -8,12 +8,14 @@
 #include <semaphore.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <signal.h>
 
 void setupServerSocket();
 void broadcast(char* msg);
 void sendMessage(char* msg, int client);
 void childStuff(int clientfd);
 void receiveMessage(int clientfd);
+void sighandler(int);
 int checkForWhisper(const char* msg, int msglen);
 
 struct sockaddr_in* server;
@@ -46,6 +48,7 @@ int main(int argc, char** argv)
     
    while(1)
    {
+    signal(SIGUSR1, sighandler);
     printf("Listening....\n");
     clientfd = accept(sockfd ,  (struct sockaddr *)server , &serverSize);
     printf("Client Connected.... %d\n", clientfd);
@@ -55,12 +58,16 @@ int main(int argc, char** argv)
     clients[(*numberOfConnectedClients)++] = clientfd;
     sem_post(&block);
     
+    
+    
     pid = fork();
     
     if(pid == 0)
     {
         break;
     }
+    raise(SIGUSR1); //let the processes know a new user connected
+    
    }
    
    //only do this if we are the child and have broken out of the infinite loop
@@ -68,6 +75,7 @@ int main(int argc, char** argv)
    {
        childStuff(clientfd);
    }
+   
 }
 
 
@@ -197,5 +205,15 @@ int checkForWhisper(const char* msg, int msglen)
     else
     {
         return 0;
+    }
+}
+
+void sighandler(int signum)
+{
+    if(signum == SIGUSR1)
+    {
+        char* informClients = "A new Client has connected\n";
+        broadcast(informClients);
+        printf("I got here\n");
     }
 }

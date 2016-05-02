@@ -51,16 +51,19 @@ int main(int argc, char** argv)
         if(pid == 0)
         {
             puts("Child 1");
-            //child 1 should monitor for new messages received
-            error = recv(sockfd[0], serverReply, MAX_SIZE, 0);
-            if(error < 0)
+            while(1)
             {
-                puts("recv failed");
+                //child 1 should monitor for new messages received
+                error = recv(sockfd[0], serverReply, MAX_SIZE, 0);
+                if(error < 0)
+                {
+                    puts("recv failed");
+                }
+                else
+                {
+                    puts(serverReply);
+                }
             }
-            else
-            {
-                puts(serverReply);
-            } 
         }
         else
         {
